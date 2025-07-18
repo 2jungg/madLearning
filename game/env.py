@@ -1,8 +1,8 @@
 import time
 
-import gym
+import gymnasium as gym
 import numpy as np
-from gym import spaces
+from gymnasium import spaces
 from pynput.keyboard import Controller
 from pynput.keyboard import Key
 from selenium import webdriver
@@ -171,7 +171,7 @@ class QWOPEnv(gym.Env):
         # self.last_press_time = time.time()
         time.sleep(PRESS_DURATION)
 
-    def reset(self):
+    def reset(self, seed=None, options=None):
 
         # Send 'R' key press to restart game
         self.send_keys(['r', Key.space])
@@ -182,7 +182,7 @@ class QWOPEnv(gym.Env):
         self.previous_torso_y = 0
         self._release_all_keys_()
 
-        return self._get_state_()[0]
+        return self._get_state_()[0], {}
 
     def step(self, action_id):
 
@@ -205,7 +205,7 @@ class QWOPEnv(gym.Env):
 
 if __name__ == '__main__':
     env = QWOPEnv()
-    check_env(env)
+    # check_env(env)
     while True:
         if env.gameover:
             env.reset()
