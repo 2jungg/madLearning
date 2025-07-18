@@ -1,4 +1,6 @@
-gym==0.26.2
+gymnasium
+ale-py
+pygame
 numpy
 pynput
 selenium

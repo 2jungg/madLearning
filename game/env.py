@@ -1,8 +1,8 @@
 import time
 
-import gym
+import gymnasium as gym
 import numpy as np
-from gym import spaces
+from gymnasium import spaces
 from pynput.keyboard import Controller
 from pynput.keyboard import Key
 from selenium import webdriver
@@ -33,7 +33,7 @@ class QWOPEnv(gym.Env):
     meta_data = {'render.modes': ['human']}
     pressed_keys = set()
 
-    def __init__(self):
+    def __init__(self, render_mode=None):
 
         # Open AI gym specifications
         super(QWOPEnv, self).__init__()
@@ -52,7 +52,12 @@ class QWOPEnv(gym.Env):
         self.evoke_actions = True
 
         # Open browser and go to QWOP page
-        self.driver = webdriver.Chrome()
+        options = webdriver.ChromeOptions()
+        if render_mode != 'human':
+            options.add_argument('--headless')
+            options.add_argument('--no-sandbox')
+            options.add_argument('--disable-dev-shm-usage')
+        self.driver = webdriver.Chrome(options=options)
         self.driver.get(f'http://localhost:{PORT}/Athletics.html')
 
         # Wait a bit and then start game
@@ -171,7 +176,7 @@ class QWOPEnv(gym.Env):
         # self.last_press_time = time.time()
         time.sleep(PRESS_DURATION)
 
-    def reset(self):
+    def reset(self, seed=None, options=None):
 
         # Send 'R' key press to restart game
         self.send_keys(['r', Key.space])
@@ -181,6 +186,7 @@ class QWOPEnv(gym.Env):
         self.previous_torso_x = 0
         self.previous_torso_y = 0
         self._release_all_keys_()
+        self.driver.find_element(By.XPATH, "//body").click()
 
         return self._get_state_()[0]
 
@@ -204,8 +210,9 @@ class QWOPEnv(gym.Env):
 
 
 if __name__ == '__main__':
+    # To render the game, use QWOPEnv(render_mode='human')
     env = QWOPEnv()
-    check_env(env)
+    # check_env(env)
     while True:
         if env.gameover:
             env.reset()
