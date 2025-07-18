@@ -188,7 +188,7 @@ class QWOPEnv(gym.Env):
         self._release_all_keys_()
         self.driver.find_element(By.XPATH, "//body").click()
 
-        return self._get_state_()[0]
+        return self._get_state_()[0], {}
 
     def step(self, action_id):
 
