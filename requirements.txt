@@ -2,6 +2,6 @@ gymnasium
 ale-py
 pygame
 numpy
-pynput
 selenium
 stable-baselines3
+webdriver-manager
