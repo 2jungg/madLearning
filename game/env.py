@@ -123,9 +123,9 @@ class QWOPEnv(gym.Env):
         # print(f"state: {state}")
         print(f"reward: {reward}")
         print(f"done: {done}")
-        if done:
-            print(f"distance: {torso_x}")
-            time.sleep(PRESS_DURATION*10)
+        # if done:
+        #     print(f"distance: {torso_x}")
+        #     time.sleep(PRESS_DURATION*10)
 
         return state, reward, done, {}
 
@@ -143,7 +143,7 @@ class QWOPEnv(gym.Env):
         action.perform()
 
         self.pressed_keys = keys_to_press
-        time.sleep(PRESS_DURATION)
+        # time.sleep(PRESS_DURATION)
 
     def reset(self, seed=None, options=None):
         # Release any currently pressed keys
@@ -174,8 +174,8 @@ class QWOPEnv(gym.Env):
 
         if self.evoke_actions:
             self.send_keys(list(keys))
-        else:
-            time.sleep(PRESS_DURATION)
+        # else:
+        #     time.sleep(PRESS_DURATION)
 
         return self._get_state_()
 
