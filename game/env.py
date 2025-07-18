@@ -12,7 +12,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from stable_baselines3.common.env_checker import check_env
 
-PORT = 8000
 PRESS_DURATION = 0.1
 MAX_EPISODE_DURATION_SECS = 120
 STATE_SPACE_N = 71
@@ -35,7 +34,7 @@ class QWOPEnv(gym.Env):
 
     meta_data = {'render.modes': ['human']}
 
-    def __init__(self, render_mode=None):
+    def __init__(self, port, render_mode=None):
 
         # Open AI gym specifications
         super(QWOPEnv, self).__init__()
@@ -46,6 +45,7 @@ class QWOPEnv(gym.Env):
         self.num_envs = 1
 
         # QWOP specific stuff
+        self.port = port
         self.gameover = False
         self.previous_score = 0
         self.previous_time = 0
@@ -63,7 +63,7 @@ class QWOPEnv(gym.Env):
             options.add_argument('--disable-dev-shm-usage')
 
         self.driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
-        self.driver.get(f'http://localhost:{PORT}/Athletics.html')
+        self.driver.get(f'http://localhost:{self.port}/Athletics.html')
 
         # Wait a bit and then start game
         time.sleep(2)
@@ -188,20 +188,8 @@ class QWOPEnv(gym.Env):
         self.driver.quit()
 
 
-def make_env(render_mode=None):
+def make_env(port, render_mode=None):
     def _init():
-        env = QWOPEnv(render_mode=render_mode)
+        env = QWOPEnv(port=port, render_mode=render_mode)
         return env
     return _init
-
-if __name__ == '__main__':
-    # To render the game, use QWOPEnv(render_mode='human')
-    env = QWOPEnv(render_mode='human')
-    # check_env(env)
-    obs = env.reset()
-    while True:
-        if env.gameover:
-            obs = env.reset()
-        else:
-            action = env.action_space.sample()
-            obs, reward, done, info = env.step(action)
