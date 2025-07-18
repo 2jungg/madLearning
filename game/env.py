@@ -165,7 +165,8 @@ class QWOPEnv(gym.Env):
         self.previous_torso_y = 0
         self.body.click()
 
-        return self._get_state_()[0]
+        state, _, _, _ = self._get_state_()
+        return state, {}
 
     def step(self, action_id):
 
@@ -177,7 +178,8 @@ class QWOPEnv(gym.Env):
         # else:
         #     time.sleep(PRESS_DURATION)
 
-        return self._get_state_()
+        state, reward, done, _ = self._get_state_()
+        return state, reward, done, False, {}
 
     def render(self, mode='human'):
         pass
@@ -186,13 +188,20 @@ class QWOPEnv(gym.Env):
         self.driver.quit()
 
 
+def make_env(render_mode=None):
+    def _init():
+        env = QWOPEnv(render_mode=render_mode)
+        return env
+    return _init
+
 if __name__ == '__main__':
     # To render the game, use QWOPEnv(render_mode='human')
-    env = QWOPEnv()
+    env = QWOPEnv(render_mode='human')
     # check_env(env)
-    env.reset()
+    obs = env.reset()
     while True:
         if env.gameover:
-            env.reset()
+            obs = env.reset()
         else:
-            env.step(env.action_space.sample())
+            action = env.action_space.sample()
+            obs, reward, done, info = env.step(action)

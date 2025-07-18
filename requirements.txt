@@ -5,3 +5,4 @@ numpy
 selenium
 stable-baselines3
 webdriver-manager
+tensorboard
