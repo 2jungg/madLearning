@@ -6,7 +6,8 @@ from gym import spaces
 from pynput.keyboard import Controller
 from pynput.keyboard import Key
 from selenium import webdriver
-from stable_baselines.common.env_checker import check_env
+from selenium.webdriver.common.by import By
+from stable_baselines3.common.env_checker import check_env
 
 PORT = 8000
 PRESS_DURATION = 0.1
@@ -56,7 +57,7 @@ class QWOPEnv(gym.Env):
 
         # Wait a bit and then start game
         time.sleep(2)
-        self.driver.find_element_by_xpath("//body").click()
+        self.driver.find_element(By.XPATH, "//body").click()
 
         self.keyboard = Controller()
         self.last_press_time = time.time()
