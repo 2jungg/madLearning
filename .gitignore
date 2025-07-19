@@ -212,3 +212,8 @@ __marimo__/
 logs/
 log.txt
 models/
+
+logs/
+log.txt
+models/
+*.zip
