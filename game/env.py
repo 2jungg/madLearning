@@ -1,5 +1,6 @@
 import time
 import uuid
+import tempfile
 
 import gymnasium as gym
 import numpy as np
@@ -15,19 +16,7 @@ from stable_baselines3.common.env_checker import check_env
 PRESS_DURATION = 0.1
 MAX_EPISODE_DURATION_SECS = 120
 STATE_SPACE_N = 71
-ACTIONS = {
-    0: 'qw',
-    1: 'qo',
-    2: 'qp',
-    3: 'q',
-    4: 'wo',
-    5: 'wp',
-    6: 'w',
-    7: 'op',
-    8: 'o',
-    9: 'p',
-    10: '',
-}
+KEYS = ['q', 'w', 'o', 'p']
 
 
 class QWOPEnv(gym.Env):
@@ -38,7 +27,7 @@ class QWOPEnv(gym.Env):
 
         # Open AI gym specifications
         super(QWOPEnv, self).__init__()
-        self.action_space = spaces.Discrete(len(ACTIONS))
+        self.action_space = spaces.MultiBinary(4)
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=[STATE_SPACE_N], dtype=np.float32
         )
@@ -62,24 +51,18 @@ class QWOPEnv(gym.Env):
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
+        options.add_argument('--remote-debugging-port=9222')
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-infobars")
+        options.add_argument("--start-maximized")
+        options.add_argument("--disable-browser-side-navigation")
         
         if render_mode != 'human':
             options.add_argument('--headless')
-            options.add_argument('--no-sandbox')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--disable-gpu') # GPU 하드웨어 가속 비활성화
-            options.add_argument('--disable-extensions') # 확장 프로그램 비활성화
-            options.add_argument('--disable-notifications') # 알림 비활성화
-            options.add_argument('--disable-popup-blocking') # 팝업 차단 비활성화
-            options.add_argument('--disable-backgrounding-occluded-windows') # 백그라운드 탭 비활성화
-            options.add_argument('--incognito') # 시크릿 모드 (일부 오버헤드 감소)
-            options.add_argument('--log-level=3') # 브라우저 로그 레벨 최소화 (SEVERE만 표시)
-            options.add_argument('blink-settings=imagesEnabled=false') # 이미지 로딩 비활성화 (QWOP 게임에 필요 없다면)
-            options.add_argument('--mute-audio') # 오디오 음소거 (QWOP 게임에 필요 없다면)
-            options.add_argument('--window-size=800,600') # 창 크기 지정 (더 작은 렌더링 영역)
-        
+            options.add_argument('--window-size=800,600')
+
         # 충돌을 피하기 위해 고유한 사용자 데이터 디렉토리 지정
-        user_data_dir = f"/tmp/chrome-user-data-{uuid.uuid4()}"
+        user_data_dir = tempfile.mkdtemp()
         options.add_argument(f"--user-data-dir={user_data_dir}")
 
         self.driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
@@ -118,7 +101,9 @@ class QWOPEnv(gym.Env):
 
         # Reward for moving forward
         reward1 = max(torso_x - self.previous_torso_x, 0)
-        reward2 = min(head_y - self.previous_head_y, 0)
+        reward2 = max(-(head_y - self.previous_head_y), 0)
+        # reward3 = head_y
+        # print(f"head_y: {head_y}")
 
         # Combine rewards
         reward = reward1 + reward2
@@ -188,15 +173,13 @@ class QWOPEnv(gym.Env):
         state, _, _, _ = self._get_state_()
         return state, {}
 
-    def step(self, action_id):
+    def step(self, action):
 
         # send action
-        if isinstance(action_id, np.ndarray):
-            action_id = action_id.item()  # NumPy 배열에서 스칼라 값 추출
-        keys = ACTIONS[action_id]
+        keys_to_press = [KEYS[i] for i, val in enumerate(action) if val == 1]
 
         if self.evoke_actions:
-            self.send_keys(list(keys))
+            self.send_keys(keys_to_press)
         # else:
         #     time.sleep(PRESS_DURATION)
 
