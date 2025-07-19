@@ -208,3 +208,7 @@ __marimo__/
 
 *.deb
 *.sh
+
+logs/
+log.txt
+models/
