@@ -131,8 +131,8 @@ class QWOPEnv(gym.Env):
             state = state + list(part.values())
         state = np.array(state)
         # print(f"state: {state}")
-        print(f"reward: {reward}")
-        print(f"done: {done}")
+        # print(f"reward: {reward}")
+        # print(f"done: {done}")
         # if done:
         #     print(f"distance: {torso_x}")
         #     time.sleep(PRESS_DURATION*10)
