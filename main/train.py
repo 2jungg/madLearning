@@ -26,7 +26,7 @@ if __name__ == '__main__':
     os.makedirs(model_dir, exist_ok=True)
 
     # 병렬 환경 생성 (4개 워커)
-    num_cpu = 1
+    num_cpu = 4
     start_port = 8000
     game_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'game'))
 
