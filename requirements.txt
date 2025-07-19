@@ -4,5 +4,6 @@ pygame
 numpy
 selenium
 stable-baselines3
+sb3-contrib
 webdriver-manager
 tensorboard

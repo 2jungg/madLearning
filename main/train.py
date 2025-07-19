@@ -5,7 +5,7 @@ import http.server
 import socketserver
 from functools import partial
 
-from stable_baselines3 import PPO
+from sb3_contrib import RecurrentPPO
 from stable_baselines3.common.env_util import SubprocVecEnv
 from stable_baselines3.common.callbacks import CheckpointCallback
 from game.env import make_env
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     checkpoint_callback = CheckpointCallback(save_freq=10000, save_path=model_dir, name_prefix='ppo_qwop')
 
     # PPO 모델 정의
-    model = PPO('MlpPolicy', vec_env, verbose=1, tensorboard_log=log_dir, device=device)
+    model = RecurrentPPO('MlpLstmPolicy', vec_env, verbose=1, tensorboard_log=log_dir, device=device, n_steps=50)
 
     try:
         # 모델 학습 시작
