@@ -57,6 +57,12 @@ class QWOPEnv(gym.Env):
 
         # Open browser and go to QWOP page
         options = webdriver.ChromeOptions()
+        
+        # 자동화/컨테이너 환경에서 안정적인 실행을 위한 옵션
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        
         if render_mode != 'human':
             options.add_argument('--headless')
             options.add_argument('--no-sandbox')
@@ -71,6 +77,10 @@ class QWOPEnv(gym.Env):
             options.add_argument('blink-settings=imagesEnabled=false') # 이미지 로딩 비활성화 (QWOP 게임에 필요 없다면)
             options.add_argument('--mute-audio') # 오디오 음소거 (QWOP 게임에 필요 없다면)
             options.add_argument('--window-size=800,600') # 창 크기 지정 (더 작은 렌더링 영역)
+        
+        # 충돌을 피하기 위해 고유한 사용자 데이터 디렉토리 지정
+        user_data_dir = f"/tmp/chrome-user-data-{uuid.uuid4()}"
+        options.add_argument(f"--user-data-dir={user_data_dir}")
 
         self.driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
         self.driver.get(f'http://localhost:{self.port}/Athletics.html')
@@ -153,7 +163,7 @@ class QWOPEnv(gym.Env):
         action.perform()
 
         self.pressed_keys = keys_to_press
-        # time.sleep(PRESS_DURATION)
+        time.sleep(PRESS_DURATION)
 
     def reset(self, seed=None, options=None):
         # Release any currently pressed keys
@@ -181,6 +191,8 @@ class QWOPEnv(gym.Env):
     def step(self, action_id):
 
         # send action
+        if isinstance(action_id, np.ndarray):
+            action_id = action_id.item()  # NumPy 배열에서 스칼라 값 추출
         keys = ACTIONS[action_id]
 
         if self.evoke_actions:
