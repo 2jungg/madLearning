@@ -12,22 +12,18 @@ from functools import partial
 import socket
 
 from stable_baselines3 import PPO
-from game.env import QWOPEnv
+# game.env_multi_binary에서 QWOPEnv를 가져오도록 수정
+from game.env_multi_binary import QWOPEnv
 
-def find_available_port(start_port=8000, end_port=9000):
-    """지정된 범위 내에서 사용 가능한 포트를 찾습니다."""
-    for port in range(start_port, end_port + 1):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(('localhost', port)) != 0:
-                return port
-    raise IOError("No available ports found in the specified range.")
-
-def run_server(port, directory):
-    """지정된 디렉토리에서 간단한 HTTP 서버를 실행합니다."""
+def run_server(queue, directory):
+    """지정된 디렉토리에서 간단한 HTTP 서버를 실행하고 사용 가능한 포트를 큐에 넣습니다."""
     handler = partial(http.server.SimpleHTTPRequestHandler, directory=directory)
     # 주소 재사용 허용
     socketserver.TCPServer.allow_reuse_address = True
-    with socketserver.TCPServer(('', port), handler) as httpd:
+    # 포트 0에 바인딩하여 OS가 사용 가능한 포트를 선택하도록 함
+    with socketserver.TCPServer(("", 0), handler) as httpd:
+        port = httpd.server_address[1]
+        queue.put(port)
         print(f"Serving at port {port} for directory {directory}")
         httpd.serve_forever()
 
@@ -65,18 +61,28 @@ def evaluate_model(model_path, env, num_episodes=5):
 if __name__ == '__main__':
     # 설정
     model_dir = "./models/"
-    start_port = find_available_port() # 사용 가능한 포트를 동적으로 찾기
-    print(f"Found available port: {start_port}")
     game_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'game'))
     num_eval_episodes = 5
 
+    # 서버 프로세스에서 포트를 가져오기 위한 큐
+    port_queue = multiprocessing.Queue()
+
     # 웹 서버 실행
-    server_process = multiprocessing.Process(target=run_server, args=(start_port, game_dir))
+    server_process = multiprocessing.Process(target=run_server, args=(port_queue, game_dir))
     server_process.daemon = True
     server_process.start()
-    time.sleep(2)  # 서버가 시작될 시간을 줍니다.
 
-    # 평가 환경 생성 (GUI 렌더링 비활성화)
+    # 서버에서 실제 포트 번호를 가져옴
+    try:
+        start_port = port_queue.get(timeout=10)
+        print(f"Server started on port: {start_port}")
+    except multiprocessing.queues.Empty:
+        print("Failed to get port from server process.")
+        server_process.terminate()
+        sys.exit(1)
+
+
+    # 평가 환경 생성 (GUI 렌더링 활성화)
     env = QWOPEnv(port=start_port, render_mode='human')
 
     try:
@@ -87,9 +93,8 @@ if __name__ == '__main__':
         else:
             # 각 모델 평가
             for model_path in sorted(model_files):
-                if "320000" not in model_path:
+                if "v3" not in model_path:
                     continue
-                    pass
                 evaluate_model(model_path, env, num_episodes=num_eval_episodes)
                 # 모델 간 평가 사이에 잠시 대기
                 print("\n다음 모델 평가를 위해 5초간 대기합니다...")
