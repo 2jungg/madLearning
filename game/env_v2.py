@@ -80,7 +80,7 @@ class QWOPEnv(gym.Env):
             try:
                 # Check if the globalgamestate object exists and is not null
                 game_state = self._get_variable_('globalgamestate')
-                if game_state is not None:
+                if game_state and game_state.get('gameEnded') is not None: # 더 구체적인 조건 확인
                     print("Game loaded.")
                     break
             except Exception as e:
@@ -90,24 +90,50 @@ class QWOPEnv(gym.Env):
                 raise RuntimeError("Timeout waiting for game to load.")
             time.sleep(0.5)
 
-        self.body = self.driver.find_element(By.XPATH, "//body")
-        self.body.click()
+        # Wait a bit and then start game by clicking
+        print("Focusing and clicking the game window to start.")
+        time.sleep(2) # 사용자가 제안한 대기 시간
+        try:
+            self.driver.execute_script("window.focus();")
+            self.body = self.driver.find_element(By.XPATH, "//body")
+            ActionChains(self.driver).click(self.body).perform()
+            print("Game window clicked.")
+        except Exception as e:
+            print(f"Warning: Could not click the game window: {e}")
+
 
         self.last_press_time = time.time()
 
     def _get_variable_(self, var_name):
-        return self.driver.execute_script(f'return {var_name};')
+        # Headless 모드에서 JavaScript 변수가 로드될 시간을 주기 위해 짧게 대기
+        time.sleep(0.01) 
+        result = self.driver.execute_script(f'return typeof {var_name} === "undefined" ? null : {var_name};')
+        
+        # None 또는 dict가 아닌 경우, 게임이 아직 준비되지 않았을 수 있음
+        if result is None:
+            # print(f"DEBUG: _get_variable_ - {var_name} is undefined.")
+            return None
+        if not isinstance(result, dict):
+            # print(f"DEBUG: _get_variable_ - {var_name} returned non-dict: {type(result)}. Returning None.")
+            return None
+            
+        # print(f"DEBUG: _get_variable_ - {var_name} returned: {result}")
+        return result
 
     def _get_state_(self):
-
         game_state = self._get_variable_('globalgamestate')
         body_state = self._get_variable_('globalbodystate')
 
+        # Ensure game_state and body_state are valid dictionaries and body_state is not empty
+        if game_state is None or body_state is None or not body_state:
+            # If states are not valid or body_state is empty, return a zero-filled array and mark as done
+            return np.zeros(STATE_SPACE_N, dtype=np.float32), 0, True, {}
+
         # Get done
         if (
-            (game_state['gameEnded'] > 0)
-            or (game_state['gameOver'] > 0)
-            or (game_state['scoreTime'] > MAX_EPISODE_DURATION_SECS)
+            (game_state.get('gameEnded', 0) > 0)
+            or (game_state.get('gameOver', 0) > 0)
+            or (game_state.get('scoreTime', 0) > MAX_EPISODE_DURATION_SECS)
         ):
             self.gameover = done = True
         else:
@@ -121,7 +147,7 @@ class QWOPEnv(gym.Env):
 
         # Reward for moving forward
         reward1 = max(torso_x - self.previous_torso_x, 0)
-        reward2 = min(head_y - self.previous_head_y, 0)
+        reward2 = (head_y + 4) * (-0.2)
 
         # Combine rewards
         reward = reward1 + reward2
@@ -130,25 +156,41 @@ class QWOPEnv(gym.Env):
         self.previous_torso_x = torso_x
         self.previous_torso_y = torso_y
         self.previous_head_y = head_y
-        self.previous_score = game_state['score']
-        self.previous_time = game_state['scoreTime']
-
+        self.previous_score = game_state.get('score', 0)
+        self.previous_time = game_state.get('scoreTime', 0)
         # Normalize torso_x
-        for part, values in body_state.items():
-            if 'position_x' in values:
+        for part_name, values in body_state.items():
+            if isinstance(values, dict) and 'position_x' in values:
                 values['position_x'] -= torso_x
 
-        # Convert body state
-        state = []
-        for part in body_state.values():
-            state = state + list(part.values())
-        state = np.array(state)
-        # print(f"state: {state}")
-        # print(f"reward: {reward}")
-        # print(f"done: {done}")
-        # if done:
-        #     print(f"distance: {torso_x}")
-        #     time.sleep(PRESS_DURATION*10)
+        # Initialize state as a zero-filled numpy array
+        state = np.zeros(STATE_SPACE_N, dtype=np.float32)
+        idx = 0
+
+        # Process main body parts
+        for part_name in ['torso', 'head', 'left_upper_leg', 'left_lower_leg', 'right_upper_leg', 'right_lower_leg']:
+            part = body_state.get(part_name, {})
+            if idx + 6 <= STATE_SPACE_N:
+                state[idx] = part.get('position_x', 0)
+                state[idx+1] = part.get('position_y', 0)
+                state[idx+2] = part.get('velocity_x', 0)
+                state[idx+3] = part.get('velocity_y', 0)
+                state[idx+4] = part.get('angle', 0)
+                state[idx+5] = part.get('angular_velocity', 0)
+                idx += 6
+            else:
+                break
+
+        # Add joint angles and velocities if available
+        for i in range(5): # Adjust range based on actual number of joints
+            if idx + 2 <= STATE_SPACE_N:
+                joint_angle = body_state.get(f'joint{i}_angle', 0)
+                joint_angular_velocity = body_state.get(f'joint{i}_angular_velocity', 0)
+                state[idx] = joint_angle
+                state[idx+1] = joint_angular_velocity
+                idx += 2
+            else:
+                break
 
         return state, reward, done, {}
 
@@ -181,17 +223,24 @@ class QWOPEnv(gym.Env):
         action = ActionChains(self.driver)
         action.key_down('r').key_down(Keys.SPACE).pause(PRESS_DURATION).key_up('r').key_up(Keys.SPACE).perform()
 
-        # Wait until the game is running again
+        # Wait until the game is running again and body state is available
         start_time = time.time()
         while True:
             try:
                 game_state = self._get_variable_('globalgamestate')
-                if game_state is not None and not game_state.get('gameOver'):
+                body_state = self._get_variable_('globalbodystate') # Get body state here
+                if (
+                    game_state is not None
+                    and not game_state.get('gameOver')
+                    and body_state is not None
+                    and 'torso' in body_state
+                    and 'head' in body_state
+                ):
                     break
             except Exception as e:
                 pass
             if time.time() - start_time > 10: # 10초 타임아웃
-                print("Warning: Timeout waiting for game to restart.")
+                print("Warning: Timeout waiting for game to restart and body state to be ready.")
                 break
             time.sleep(0.1)
 
@@ -200,9 +249,20 @@ class QWOPEnv(gym.Env):
         self.previous_time = 0
         self.previous_torso_x = 0
         self.previous_torso_y = 0
-        self.body.click()
+        
+        # Click to ensure focus, especially in headless mode
+        try:
+            self.driver.execute_script("window.focus();")
+            ActionChains(self.driver).click(self.body).perform()
+        except Exception as e:
+            print(f"Warning: Could not click the game window during reset: {e}")
+
+
+        # Add a small delay to ensure the game state is fully updated
+        time.sleep(0.5)
 
         state, _, _, _ = self._get_state_()
+        print(f"DEBUG: reset - State shape before return: {state.shape}")
         return state, {}
 
     def step(self, action):
@@ -222,7 +282,7 @@ class QWOPEnv(gym.Env):
         state, reward, done, _ = self._get_state_()
         return state, reward, done, False, {}
 
-    def render(self, mode='human'):
+    def render(self, mode='headless'):
         pass
 
     def close(self):

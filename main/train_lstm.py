@@ -13,7 +13,10 @@ from game.env_v2 import make_env
 
 def run_server(port, directory):
     handler = partial(http.server.SimpleHTTPRequestHandler, directory=directory)
-    with socketserver.TCPServer(('', port), handler) as httpd:
+    class ReusableTCPServer(socketserver.TCPServer):
+        allow_reuse_address = True
+
+    with ReusableTCPServer(('', port), handler) as httpd:
         print(f"Serving at port {port} for directory {directory}")
         httpd.serve_forever()
 
@@ -25,7 +28,7 @@ if __name__ == '__main__':
     MLP_SIZE = 128             # 정책/가치 네트워크의 MLP 크기
     TOTAL_TIMESTEPS = 1000000  # 총 학습 타임스텝
     N_STEPS = 2048             # 각 환경에서 데이터를 수집할 스텝 수 (늘림)
-    NUM_CPU = 1                # 사용할 CPU 코어 수 (1로 고정)
+    NUM_CPU = 4                # 사용할 CPU 코어 수 (1로 고정)
     # --------------------------
 
     # 로그 및 모델 저장 디렉토리 생성
@@ -42,7 +45,7 @@ if __name__ == '__main__':
     server_process.daemon = True
     server_process.start()
 
-    env = make_env(port=start_port, render_mode='human')()
+    env = make_env(port=start_port, render_mode='headless')()
 
     # GPU 사용 가능 여부 확인
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
