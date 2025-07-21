@@ -15,19 +15,7 @@ from stable_baselines3.common.env_checker import check_env
 PRESS_DURATION = 0.1
 MAX_EPISODE_DURATION_SECS = 120
 STATE_SPACE_N = 71
-ACTIONS = {
-    0: 'qw',
-    1: 'qo',
-    2: 'qp',
-    3: 'q',
-    4: 'wo',
-    5: 'wp',
-    6: 'w',
-    7: 'op',
-    8: 'o',
-    9: 'p',
-    10: '',
-}
+KEYS = ['q', 'w', 'o', 'p']
 
 
 class QWOPEnv(gym.Env):
@@ -38,7 +26,7 @@ class QWOPEnv(gym.Env):
 
         # Open AI gym specifications
         super(QWOPEnv, self).__init__()
-        self.action_space = spaces.Discrete(len(ACTIONS))
+        self.action_space = spaces.Discrete(16)
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=[STATE_SPACE_N], dtype=np.float32
         )
@@ -118,10 +106,7 @@ class QWOPEnv(gym.Env):
 
         # Reward for moving forward
         reward1 = max(torso_x - self.previous_torso_x, 0)
-        reward2 = max(-(head_y - self.previous_head_y), 0)
-        reward3 = head_y * -0.02
-
-        print(f'r1: {reward1:.3f}, r2: {reward2:.3f}, r3: {reward3:.3f} x : {torso_x:.3f}, hy: {head_y:.3f}')
+        reward2 = min(head_y - self.previous_head_y, 0)
 
         # Combine rewards
         reward = reward1 + reward2
@@ -191,15 +176,17 @@ class QWOPEnv(gym.Env):
         state, _, _, _ = self._get_state_()
         return state, {}
 
-    def step(self, action_id):
+    def step(self, action):
 
         # send action
-        if isinstance(action_id, np.ndarray):
-            action_id = action_id.item()  # NumPy 배열에서 스칼라 값 추출
-        keys = ACTIONS[action_id]
+        keys_to_press = []
+        binary_action = f'{action:04b}'
+        for i in range(4):
+            if binary_action[i] == '1':
+                keys_to_press.append(KEYS[i])
 
         if self.evoke_actions:
-            self.send_keys(list(keys))
+            self.send_keys(keys_to_press)
         # else:
         #     time.sleep(PRESS_DURATION)
 
