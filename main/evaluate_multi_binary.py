@@ -87,14 +87,12 @@ if __name__ == '__main__':
 
     try:
         # 모델 파일 목록 가져오기
-        model_files = glob.glob(os.path.join(model_dir, "*.zip"))
+        model_files = glob.glob(os.path.join(model_dir + "/v5", "*.zip"))
         if not model_files:
             print(f"{model_dir}에서 모델 파일을 찾을 수 없습니다.")
         else:
             # 각 모델 평가
             for model_path in sorted(model_files):
-                if "v3" not in model_path:
-                    continue
                 evaluate_model(model_path, env, num_episodes=num_eval_episodes)
                 # 모델 간 평가 사이에 잠시 대기
                 print("\n다음 모델 평가를 위해 5초간 대기합니다...")
