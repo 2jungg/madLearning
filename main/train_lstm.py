@@ -24,8 +24,8 @@ if __name__ == '__main__':
     LSTM_HIDDEN_SIZE = 128     # 각 LSTM 계층의 히든 유닛 크기
     MLP_SIZE = 128             # 정책/가치 네트워크의 MLP 크기
     TOTAL_TIMESTEPS = 1000000  # 총 학습 타임스텝
-    N_STEPS = 50               # 각 환경에서 데이터를 수집할 스텝 수
-    NUM_CPU = 4                # 사용할 CPU 코어 수
+    N_STEPS = 2048             # 각 환경에서 데이터를 수집할 스텝 수 (늘림)
+    NUM_CPU = 1                # 사용할 CPU 코어 수 (1로 고정)
     # --------------------------
 
     # 로그 및 모델 저장 디렉토리 생성
@@ -34,20 +34,15 @@ if __name__ == '__main__':
     os.makedirs(log_dir, exist_ok=True)
     os.makedirs(model_dir, exist_ok=True)
 
-    # 병렬 환경 생성
-    num_cpu = NUM_CPU
+    # 단일 환경 생성
     start_port = 8000
     game_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'game'))
 
-    servers = []
-    for i in range(num_cpu):
-        port = start_port + i
-        server_process = multiprocessing.Process(target=run_server, args=(port, game_dir))
-        server_process.daemon = True
-        server_process.start()
-        servers.append(server_process)
+    server_process = multiprocessing.Process(target=run_server, args=(start_port, game_dir))
+    server_process.daemon = True
+    server_process.start()
 
-    vec_env = SubprocVecEnv([make_env(port=start_port + i) for i in range(num_cpu)])
+    env = make_env(port=start_port, render_mode='human')()
 
     # GPU 사용 가능 여부 확인
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -69,7 +64,7 @@ if __name__ == '__main__':
     # PPO 모델 정의
     model = RecurrentPPO(
         'MlpLstmPolicy',
-        vec_env,
+        env,  # vec_env 대신 env 사용
         verbose=1,
         tensorboard_log=log_dir,
         device=device,
@@ -86,7 +81,6 @@ if __name__ == '__main__':
 
     finally:
         # 환경 및 서버 종료
-        vec_env.close()
-        for server in servers:
-            server.terminate()
-            server.join()
+        env.close()
+        server_process.terminate()
+        server_process.join()

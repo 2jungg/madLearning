@@ -73,8 +73,23 @@ class QWOPEnv(gym.Env):
         self.driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
         self.driver.get(f'http://localhost:{self.port}/Athletics.html')
 
-        # Wait a bit and then start game
-        time.sleep(2)
+        # Wait until the game is running
+        print("Waiting for game to load...")
+        start_time = time.time()
+        while True:
+            try:
+                # Check if the globalgamestate object exists and is not null
+                game_state = self._get_variable_('globalgamestate')
+                if game_state is not None:
+                    print("Game loaded.")
+                    break
+            except Exception as e:
+                # Game might not be initialized yet, ignore and retry
+                pass
+            if time.time() - start_time > 30: # 30초 타임아웃
+                raise RuntimeError("Timeout waiting for game to load.")
+            time.sleep(0.5)
+
         self.body = self.driver.find_element(By.XPATH, "//body")
         self.body.click()
 
@@ -99,10 +114,10 @@ class QWOPEnv(gym.Env):
             self.gameover = done = False
 
         # Get reward
-        torso_x = body_state['torso']['position_x']
-        torso_y = body_state['torso']['position_y']
+        torso_x = body_state.get('torso', {}).get('position_x', self.previous_torso_x)
+        torso_y = body_state.get('torso', {}).get('position_y', self.previous_torso_y)
 
-        head_y = body_state['head']['position_y']
+        head_y = body_state.get('head', {}).get('position_y', self.previous_head_y)
 
         # Reward for moving forward
         reward1 = max(torso_x - self.previous_torso_x, 0)
@@ -165,6 +180,20 @@ class QWOPEnv(gym.Env):
         # Send 'R' and SPACE key press to restart game
         action = ActionChains(self.driver)
         action.key_down('r').key_down(Keys.SPACE).pause(PRESS_DURATION).key_up('r').key_up(Keys.SPACE).perform()
+
+        # Wait until the game is running again
+        start_time = time.time()
+        while True:
+            try:
+                game_state = self._get_variable_('globalgamestate')
+                if game_state is not None and not game_state.get('gameOver'):
+                    break
+            except Exception as e:
+                pass
+            if time.time() - start_time > 10: # 10초 타임아웃
+                print("Warning: Timeout waiting for game to restart.")
+                break
+            time.sleep(0.1)
 
         self.gameover = False
         self.previous_score = 0
