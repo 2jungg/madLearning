@@ -210,7 +210,9 @@ __marimo__/
 *.sh
 
 logs/
-log.txt
+logs_v2/
+*.txt
+*.csv
 models/
 
 logs/

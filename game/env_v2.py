@@ -42,6 +42,7 @@ class QWOPEnv(gym.Env):
         self.previous_torso_x = 0
         self.previous_torso_y = 0
         self.previous_head_y = 0
+        self.y_reward_scale = 1.0  # Initialize reward scale
         self.evoke_actions = True
         self.pressed_keys = set()
 
@@ -102,17 +103,11 @@ class QWOPEnv(gym.Env):
 
         # Reward for moving forward
         reward1 = max(torso_x - self.previous_torso_x, 0)
-        # reward2 = max(-(head_y - self.previous_head_y), 0)
-        # reward2 = (head_y + 4) * (-0.25)
-        # print(f"reward1: {reward1}, reward2: {reward2}, torso_x: {torso_x}, head_y: {head_y}")
-        # print(f"reward1: {reward1}, reward2: {reward2}")
-
-        # reward3 = head_y
-        # print(f"head_y: {head_y}")
-
+        # Apply the scaling factor to the penalty
+        reward2 = (head_y + 4) * (-0.25) * self.y_reward_scale
+        
         # Combine rewards
-        # reward = reward1 + reward2
-        reward = reward1
+        reward = reward1 + reward2
 
         # Update previous scores
         self.previous_torso_x = torso_x
@@ -131,17 +126,10 @@ class QWOPEnv(gym.Env):
         for part in body_state.values():
             state = state + list(part.values())
         state = np.array(state)
-        # print(f"state: {state}")
-        # print(f"reward: {reward}")
-        # print(f"done: {done}")
-        # if done:
-        #     print(f"distance: {torso_x}")
-        #     time.sleep(PRESS_DURATION*10)
 
         info = {}
         if done:
             info['distance'] = torso_x
-            info['time'] = game_state['scoreTime']
 
         return state, reward, done, info
 
